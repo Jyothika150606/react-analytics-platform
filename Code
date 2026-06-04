@@ -1,0 +1,432 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign, 
+  Users, 
+  ShoppingBag, 
+  Percent, 
+  Download, 
+  RefreshCw, 
+  Search, 
+  SlidersHorizontal, 
+  ChevronDown, 
+  ChevronUp,
+  FileText,
+  Briefcase,
+  Globe,
+  Calendar,
+  Sparkles,
+  Info,
+  Sun,
+  Moon,
+  AlertCircle
+} from 'lucide-react';
+
+// ==========================================
+// MOCK DATA GENERATOR
+// ==========================================
+const GENERATE_MOCK_DATA = () => {
+  const departments = ['Enterprise', 'SaaS', 'Professional Services', 'Consumer Hardware'];
+  const regions = ['North America', 'Europe', 'Asia-Pacific', 'Latin America'];
+  const channels = ['Direct Sales', 'Online Store', 'Channel Partners', 'Referrals'];
+  
+  const data = [];
+  const startDate = new Date('2026-01-01');
+  
+  for (let i = 0; i < 150; i++) {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + Math.floor(Math.random() * 120)); // Spans 4 months
+    
+    const department = departments[Math.floor(Math.random() * departments.length)];
+    const region = regions[Math.floor(Math.random() * regions.length)];
+    const channel = channels[Math.floor(Math.random() * channels.length)];
+    
+    // Revenue generation with some deterministic variance
+    let baseRevenue = 5000;
+    if (department === 'Enterprise') baseRevenue = 15000;
+    if (department === 'Professional Services') baseRevenue = 8000;
+    if (region === 'North America') baseRevenue *= 1.2;
+    
+    const revenue = Math.round(baseRevenue * (0.6 + Math.random() * 0.8));
+    const visitors = Math.round(revenue / (10 + Math.random() * 15));
+    const conversions = Math.round(visitors * (0.02 + Math.random() * 0.08));
+    const activeUsers = Math.round(visitors * (0.4 + Math.random() * 0.3));
+    
+    data.push({
+      id: `TX-${1000 + i}`,
+      date: date.toISOString().split('T')[0],
+      department,
+      region,
+      channel,
+      revenue,
+      visitors,
+      conversions,
+      activeUsers,
+      status: revenue > 12000 ? 'Excellent' : revenue > 6000 ? 'On Track' : 'Needs Attention'
+    });
+  }
+  return data.sort((a, b) => new Date(b.date) - new Date(a.date));
+};
+
+const RAW_DATA = GENERATE_MOCK_DATA();
+
+export default function App() {
+  // ==========================================
+  // STATE MANAGEMENT
+  // ==========================================
+  const [data, setData] = useState(RAW_DATA);
+  const [theme, setTheme] = useState('dark');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedRegion, setSelectedRegion] = useState('All');
+  const [dateRange, setDateRange] = useState({ start: '2026-01-01', end: '2026-05-01' });
+  const [sortField, setSortField] = useState('date');
+  const [sortDirection, setSortDirection] = useState('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hoveredDataPoint, setHoveredDataPoint] = useState(null);
+  const [aiInsightLoading, setAiInsightLoading] = useState(false);
+  const [aiInsightText, setAiInsightText] = useState(
+    "Based on current enterprise filters, Q1 performance is driven primarily by North American SaaS expansion. A 14% drop in Latin American Professional Services suggests reallocating promotional budgets to high-margin digital SaaS streams."
+  );
+
+  const itemsPerPage = 8;
+
+  // Toggle Theme Helper
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+  // ==========================================
+  // DATA FILTERING & SORTING LOGIC
+  // ==========================================
+  const filteredData = useMemo(() => {
+    return RAW_DATA.filter(item => {
+      const matchSearch = 
+        item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.region.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.channel.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchDept = selectedDept === 'All' || item.department === selectedDept;
+      const matchRegion = selectedRegion === 'All' || item.region === selectedRegion;
+      
+      const itemDate = new Date(item.date);
+      const startDateObj = dateRange.start ? new Date(dateRange.start) : null;
+      const endDateObj = dateRange.end ? new Date(dateRange.end) : null;
+      
+      const matchDate = (!startDateObj || itemDate >= startDateObj) && 
+                        (!endDateObj || itemDate <= endDateObj);
+
+      return matchSearch && matchDept && matchRegion && matchDate;
+    });
+  }, [searchTerm, selectedDept, selectedRegion, dateRange]);
+
+  const sortedData = useMemo(() => {
+    const sorted = [...filteredData];
+    sorted.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (typeof aVal === 'string') {
+        return sortDirection === 'asc' 
+          ? aVal.localeCompare(bVal) 
+          : bVal.localeCompare(aVal);
+      } else {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+    });
+    return sorted;
+  }, [filteredData, sortField, sortDirection]);
+
+  // Paginated Data
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedData.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedData, currentPage]);
+
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+
+  // Handle sorting trigger
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1);
+  };
+
+  // Reset Filters
+  const resetFilters = () => {
+    setSelectedDept('All');
+    setSelectedRegion('All');
+    setSearchTerm('');
+    setDateRange({ start: '2026-01-01', end: '2026-05-01' });
+    setCurrentPage(1);
+  };
+
+  // ==========================================
+  // METRICS & ANALYSIS COMPUTATIONS
+  // ==========================================
+  const metrics = useMemo(() => {
+    const totalRevenue = filteredData.reduce((acc, curr) => acc + curr.revenue, 0);
+    const totalVisitors = filteredData.reduce((acc, curr) => acc + curr.visitors, 0);
+    const totalConversions = filteredData.reduce((acc, curr) => acc + curr.conversions, 0);
+    const totalActiveUsers = filteredData.reduce((acc, curr) => acc + curr.activeUsers, 0);
+    
+    const conversionRate = totalVisitors > 0 ? (totalConversions / totalVisitors) * 100 : 0;
+    const avgOrderValue = filteredData.length > 0 ? totalRevenue / filteredData.length : 0;
+
+    // Benchmarking against static baseline for trend calculations
+    const revenueGrowth = selectedDept === 'All' ? 12.4 : 8.1;
+    const acquisitionGrowth = selectedRegion === 'All' ? 5.2 : -2.4;
+    const conversionGrowth = 1.8;
+    const activeUserGrowth = 15.3;
+
+    return {
+      revenue: totalRevenue,
+      visitors: totalVisitors,
+      conversions: totalConversions,
+      activeUsers: totalActiveUsers,
+      conversionRate,
+      avgOrderValue,
+      revenueGrowth,
+      acquisitionGrowth,
+      conversionGrowth,
+      activeUserGrowth
+    };
+  }, [filteredData, selectedDept, selectedRegion]);
+
+  // ==========================================
+  // CHART DATA PREPARATION (PURE SVG GENERATION)
+  // ==========================================
+  
+  // 1. Line Chart: Sales Trends over filtered dates
+  const salesTrendChartData = useMemo(() => {
+    const dateMap = {};
+    filteredData.forEach(item => {
+      const month = item.date.substring(0, 7); // YYYY-MM
+      dateMap[month] = (dateMap[month] || 0) + item.revenue;
+    });
+
+    const sortedMonths = Object.keys(dateMap).sort();
+    return sortedMonths.map(month => ({
+      label: month,
+      value: dateMap[month]
+    }));
+  }, [filteredData]);
+
+  // 2. Bar Chart: Performance by Department
+  const departmentChartData = useMemo(() => {
+    const depts = {};
+    filteredData.forEach(item => {
+      depts[item.department] = (depts[item.department] || 0) + item.revenue;
+    });
+    return Object.keys(depts).map(key => ({
+      label: key,
+      value: depts[key]
+    })).sort((a, b) => b.value - a.value);
+  }, [filteredData]);
+
+  // 3. Donut Chart: Regional Sales Breakdown
+  const regionalChartData = useMemo(() => {
+    const regions = {};
+    filteredData.forEach(item => {
+      regions[item.region] = (regions[item.region] || 0) + item.revenue;
+    });
+    const total = Object.values(regions).reduce((a, b) => a + b, 0);
+    return Object.keys(regions).map(key => ({
+      label: key,
+      value: regions[key],
+      percentage: total > 0 ? Math.round((regions[key] / total) * 100) : 0
+    }));
+  }, [filteredData]);
+
+  // ==========================================
+  // GEMINI SIMULATED INSIGHT GENERATION
+  // ==========================================
+  const triggerAIInsight = () => {
+    setAiInsightLoading(true);
+    setTimeout(() => {
+      const deptText = selectedDept === 'All' ? 'across all corporate divisions' : `specifically inside the ${selectedDept} sector`;
+      const regionText = selectedRegion === 'All' ? 'globally' : `focused in the ${selectedRegion} market space`;
+      const performanceNarrative = metrics.revenue > 500000 
+        ? 'exhibiting extremely high velocity. We recommend immediate investment in expansion protocols.' 
+        : 'showing stabilization. Optimize internal operational efficiency and reduce auxiliary channel costs.';
+
+      const randomInsights = [
+        `Dynamic AI Analysis: Revenue operations ${deptText} ${regionText} are currently ${performanceNarrative} Predictive modeling suggests a strong ${metrics.revenueGrowth > 10 ? 'upward continuation' : 'horizontal consolidation'} into the next quarter. Ensure marketing channels align with conversion metrics (${metrics.conversionRate.toFixed(2)}%).`,
+        `Intelligence Report: Filter parameters reveal that ${selectedDept !== 'All' ? selectedDept : 'Core SaaS and Enterprise sectors'} dominate the portfolio matrix. Average transaction volumes indicate strong localized demand in ${selectedRegion !== 'All' ? selectedRegion : 'primary regions'}. Action Item: Focus high-conversion funnel optimizations on Direct Sales pipelines.`,
+        `Scenario Synthesis: Analyzing $${(metrics.revenue / 1000).toFixed(1)}k aggregated revenue pipeline. Customer footprint indexes at ${metrics.activeUsers} active accounts. Standard modeling estimates a customer value ceiling increase of 4.5% if client onboarding latency drops below 24 hours.`
+      ];
+
+      setAiInsightText(randomInsights[Math.floor(Math.random() * randomInsights.length)]);
+      setAiInsightLoading(false);
+    }, 1200);
+  };
+
+  return (
+    <div className={`min-h-screen font-sans transition-colors duration-200 ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+      
+      {/* HEADER BAR */}
+      <header className={`border-b ${theme === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-white'} sticky top-0 z-30 backdrop-blur-md`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          
+          {/* Logo & Platform Info */}
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-lg font-bold tracking-tight">ApexMetrics</h1>
+                <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+                  Pro v4.2
+                </span>
+              </div>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Enterprise Intelligence Dashboard</p>
+            </div>
+          </div>
+
+          {/* Right Header Navigation */}
+          <div className="flex items-center space-x-4">
+            
+            {/* Real-time Indicator */}
+            <div className="hidden md:flex items-center space-x-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2.5 py-1 rounded-full text-xs font-medium">
+              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span>Live Engine Connected</span>
+            </div>
+
+            {/* Dark/Light Toggle */}
+            <button 
+              onClick={toggleTheme}
+              className={`p-2.5 rounded-xl border transition-all duration-150 ${
+                theme === 'dark' 
+                  ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                  : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-600'
+              }`}
+              title="Toggle color scheme"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {/* Refresh Action */}
+            <button 
+              onClick={() => {
+                setData(GENERATE_MOCK_DATA());
+                resetFilters();
+              }}
+              className="hidden sm:flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-150 border border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Hard Refresh</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* DASHBOARD CONTENT BODY */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        {/* CONTROLS & FILTER PANELS */}
+        <section className={`p-5 rounded-2xl border ${theme === 'dark' ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} space-y-4`}>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center space-x-2">
+              <SlidersHorizontal className="w-5 h-5 text-indigo-500" />
+              <h2 className="font-bold text-base">Analytical Viewport Filters</h2>
+            </div>
+            
+            {/* Quick Filter Summaries */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button 
+                onClick={resetFilters} 
+                className="text-xs text-indigo-500 hover:underline font-semibold pr-2"
+              >
+                Reset all parameters
+              </button>
+              <span className={`text-xs px-2.5 py-1 rounded-full ${theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                Segment: <strong className="text-indigo-500">{selectedDept}</strong>
+              </span>
+              <span className={`text-xs px-2.5 py-1 rounded-full ${theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                Region: <strong className="text-indigo-500">{selectedRegion}</strong>
+              </span>
+              <span className={`text-xs px-2.5 py-1 rounded-full ${theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                Records Matched: <strong className="text-emerald-500">{filteredData.length}</strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 pt-2">
+            
+            {/* Search Input */}
+            <div className="relative">
+              <label className="block text-[10px] uppercase font-bold tracking-wider mb-1.5 opacity-60">Search ID/Metadata</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 w-4 h-4 opacity-55" />
+                <input
+                  type="text"
+                  placeholder="Filter key items..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  className={`w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${
+                    theme === 'dark' 
+                      ? 'bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500' 
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Department Select */}
+            <div>
+              <label className="block text-[10px] uppercase font-bold tracking-wider mb-1.5 opacity-60">Business Unit</label>
+              <div className="relative">
+                <Briefcase className="absolute left-3 top-3 w-4 h-4 opacity-55 text-indigo-500" />
+                <select
+                  value={selectedDept}
+                  onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+                  className={`w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <option value="All">All Business Units</option>
+                  <option value="Enterprise">Enterprise Division</option>
+                  <option value="SaaS">SaaS Solutions</option>
+                  <option value="Professional Services">Professional Services</option>
+                  <option value="Consumer Hardware">Consumer Hardware</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Region Select */}
+            <div>
+              <label className="block text-[10px] uppercase font-bold tracking-wider mb-1.5 opacity-60">Geographical Region</label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-3 w-4 h-4 opacity-55 text-indigo-500" />
+                <select
+                  value={selectedRegion}
+                  onChange={(e) => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
+                  className={`w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <option value="All">All Regions</option>
+                  <option value="North America">North America</option>
+                  <option value="Europe">Europe</option>
+                  <option value="Asia-Pacific">Asia-Pacific</option>
+                  <option value="Latin America">Latin America</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Date Range Start */}
+            <div>
+              <label className="block text-[10px] uppercase font-bold tracking-wider mb-1.5 opacity-60">Start Interval</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-3 w-4 h-4 opacity-55" />
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => { setDateRange(prev => ({ ...prev, start: e.target.value })); setCurrentPage(1); }}
+                  className={`w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 bor
